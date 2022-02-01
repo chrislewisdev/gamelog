@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
@@ -40,11 +41,13 @@ bool tableExists(sqlite3* db, char* name) {
 int prepareDb(sqlite3* db) {
     if (!tableExists(db, "games")) {
         const char* sql = "CREATE TABLE games(id INT PRIMARY KEY, name NVARCHAR(255), alias NVARCHAR (20))";
-        // TODO: Check for errors
-        sqlite3_exec(db, sql, NULL, NULL, NULL);
+        int result = sqlite3_exec(db, sql, NULL, NULL, NULL);
+        if (result != SQLITE_OK) return result;
     }
 
     // TODO: Add all required tables (plays)
+
+    return SQLITE_OK;
 }
 
 int main(int argc, char* argv[]) {
@@ -62,7 +65,10 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    prepareDb(db);
+    if (prepareDb(db) != SQLITE_OK) {
+        printf("Error preparing database: %s\n", sqlite3_errmsg(db));
+        return 1;
+    }
 
     char* cmd = argv[1];
     // TODO: Add more commands

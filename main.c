@@ -39,13 +39,28 @@ bool tableExists(sqlite3* db, char* name) {
 }
 
 int prepareDb(sqlite3* db) {
-    if (!tableExists(db, "games")) {
-        const char* sql = "CREATE TABLE games(id INT PRIMARY KEY, name NVARCHAR(255), alias NVARCHAR (20))";
-        int result = sqlite3_exec(db, sql, NULL, NULL, NULL);
-        if (result != SQLITE_OK) return result;
+    if (!tableExists(db, "game")) {
+        const char* sql = "CREATE TABLE game("
+                            "game_id INTEGER PRIMARY KEY,"
+                            "name NVARCHAR(255),"
+                            "alias NVARCHAR (20)"
+                          ")";
+
+        int error = sqlite3_exec(db, sql, NULL, NULL, NULL);
+        if (error != SQLITE_OK) return error;
     }
 
-    // TODO: Add all required tables (plays)
+    if (!tableExists(db, "play")) {
+        const char* sql = "CREATE TABLE play("
+                            "game_id INT,"
+                            "games INT DEFAULT 1,"
+                            "timestamp TEXT DEFAULT current_timestamp,"
+                            "FOREIGN KEY (game_id) REFERENCES game(game_id) ON DELETE CASCADE"
+                          ")";
+
+        int error = sqlite3_exec(db, sql, NULL, NULL, NULL);
+        if (error != SQLITE_OK) return error;
+    }
 
     return SQLITE_OK;
 }

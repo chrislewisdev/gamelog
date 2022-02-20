@@ -1,15 +1,53 @@
 #include <assert.h>
+#include <getopt.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 #include <sqlite3.h>
 
-void printVersion() {
-    printf("gamelog v0.1\n");
+// Passed to getopt to specify what arguments can be parsed
+struct option argumentSpec[] = {
+    {"alias", required_argument, NULL, 0},
+    {0, 0, 0, 0}
+};
+
+// All possible arguments for the program. They are parsed ahead of command selection.
+typedef struct arguments {
+    char* command;
+    char* alias;
+} arguments;
+
+void assignArgument(int index, arguments* args, char* value) {
+    switch (index) {
+        // Consider: how to maintain index correctness as we add more
+        case 0:
+            args->alias = value;
+            break;
+    }
+}
+
+arguments parseArguments(int argc, char* argv[]) {
+    arguments args = {"", ""};
+    int option_index = 0;
+    int option;
+
+    while ((option = getopt_long(argc, argv, "-", argumentSpec, &option_index)) != -1) {
+        switch (option) {
+            case 0:
+               assignArgument(option_index, &args, optarg);
+               break;
+            case 1:
+                // Not sure if the storage that optarg points to will ever get disposed
+                args.command = optarg;
+                break;
+        }
+    }
+
+    return args;
 }
 
 void printHelp() {
-    printVersion();
+    printf("gamelog v0.1\n");
     printf("Supported commands:\n");
     // TODO: Indicate optional parameters
     printf("- add-game <name> <alias> (x)\n");
@@ -66,10 +104,15 @@ int prepareDb(sqlite3* db) {
 }
 
 int main(int argc, char* argv[]) {
+    // TODO: Work this into parseArguments? E.g. add a --help option
     if (argc < 2) {
         printHelp();
         return 0;
     }
+
+    arguments args = parseArguments(argc, argv);
+
+    printf("Args: \n- command: %s\n- alias: %s\n", args.command, args.alias);
 
     sqlite3* db;
     // Consider: add a parameter for the db path

@@ -1,5 +1,5 @@
 build/gamelog: build/ main.c
-	gcc -o build/gamelog main.c -lsqlite3
+	gcc -Werror -o build/gamelog main.c -lsqlite3
 
 build/:
 	mkdir build

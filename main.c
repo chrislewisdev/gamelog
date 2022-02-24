@@ -11,9 +11,8 @@ struct option argumentSpec[] = {
     {0, 0, 0, 0}
 };
 
-// All possible arguments for the program. They are parsed ahead of command selection.
+// All possible arguments for commands. They are parsed ahead of command selection.
 typedef struct arguments {
-    char* command;
     char* alias;
 } arguments;
 
@@ -26,22 +25,18 @@ void assignArgument(int index, arguments* args, char* value) {
     }
 }
 
-arguments parseArguments(int argc, char* argv[]) {
-    arguments args = {"", ""};
+arguments parseArguments(int argc, char* argv[], int* remainingOptionsIndex) {
+    arguments args = {""};
     int option_index = 0;
     int option;
 
-    while ((option = getopt_long(argc, argv, "-", argumentSpec, &option_index)) != -1) {
-        switch (option) {
-            case 0:
-               assignArgument(option_index, &args, optarg);
-               break;
-            case 1:
-                // Not sure if the storage that optarg points to will ever get disposed
-                args.command = optarg;
-                break;
+    while ((option = getopt_long(argc, argv, "", argumentSpec, &option_index)) != -1) {
+        if (option == 0) {
+           assignArgument(option_index, &args, optarg);
         }
     }
+
+    *remainingOptionsIndex = optind;
 
     return args;
 }
@@ -49,16 +44,17 @@ arguments parseArguments(int argc, char* argv[]) {
 void printHelp() {
     printf("gamelog v0.1\n");
     printf("Supported commands:\n");
-    // TODO: Indicate optional parameters
-    printf("- add-game <name> <alias> (x)\n");
-    printf("- list\n");
-    printf("- log <name> (x)\n");
-    printf("- report (x)\n");
+    printf("- add-game <name> --alias <alias>\n");
+    printf("- log <name> --games <games> --date <date>\n");
+    printf("- report\n");
 }
 
-void list() {
-    // TODO: Implement this :D
-    printf("list\n");
+void report() {
+    printf("report\n");
+}
+
+void addGame() {
+    printf("Add a game...\n");
 }
 
 bool tableExists(sqlite3* db, char* name) {
@@ -103,16 +99,21 @@ int prepareDb(sqlite3* db) {
     return SQLITE_OK;
 }
 
+void printArguments(int argc, char* argv[]) {
+    printf("Arguments list:\n");
+    for (int i = 0; i< argc; i++) {
+        printf("%d. %s\n", i, argv[i]);
+    }
+}
+
 int main(int argc, char* argv[]) {
-    // TODO: Work this into parseArguments? E.g. add a --help option
-    if (argc < 2) {
+    int remainingOptionsIndex;
+    arguments args = parseArguments(argc, argv, &remainingOptionsIndex);
+
+    if (remainingOptionsIndex >= argc) {
         printHelp();
         return 0;
     }
-
-    arguments args = parseArguments(argc, argv);
-
-    printf("Args: \n- command: %s\n- alias: %s\n", args.command, args.alias);
 
     sqlite3* db;
     // Consider: add a parameter for the db path
@@ -125,13 +126,15 @@ int main(int argc, char* argv[]) {
 
     if (prepareDb(db) != SQLITE_OK) {
         printf("Error preparing database: %s\n", sqlite3_errmsg(db));
+        sqlite3_close(db);
         return 1;
     }
 
-    char* cmd = argv[1];
-    // TODO: Add more commands
-    if (strcmp(cmd, "list") == 0) {
-        list();
+    char* cmd = argv[remainingOptionsIndex];
+    if (strcmp(cmd, "report") == 0) {
+        report();
+    } else if (strcmp(cmd, "add-game") == 0) {
+        addGame();
     }
 
     sqlite3_close(db);

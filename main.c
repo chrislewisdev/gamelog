@@ -53,8 +53,14 @@ void report() {
     printf("report\n");
 }
 
-void addGame() {
-    printf("Add a game...\n");
+void addGame(int argc, char* argv[], int argsIndex) {
+    if (argsIndex >= argc) {
+        printf("add-game: required argument <name>\n");
+        return;
+    }
+
+    char* name = argv[argsIndex];
+    printf("name: %s\n", name);
 }
 
 bool tableExists(sqlite3* db, char* name) {
@@ -134,7 +140,7 @@ int main(int argc, char* argv[]) {
     if (strcmp(cmd, "report") == 0) {
         report();
     } else if (strcmp(cmd, "add-game") == 0) {
-        addGame();
+        addGame(argc, argv, remainingOptionsIndex + 1);
     }
 
     sqlite3_close(db);

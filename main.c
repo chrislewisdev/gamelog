@@ -47,8 +47,24 @@ void printHelp() {
     printf("- report\n");
 }
 
-void report() {
-    printf("report\n");
+void report(sqlite3* db) {
+    sqlite3_stmt* query;
+    const char* sql = "SELECT name, alias FROM game";
+
+    sqlite3_prepare_v2(db, sql, -1, &query, NULL);
+
+    printf("Name | Alias\n");
+    printf("-------------------------\n");
+
+    while (sqlite3_step(query) == SQLITE_ROW) {
+        const char* name = sqlite3_column_text(query, 0);
+        const char* alias = sqlite3_column_text(query, 1);
+        printf("%s | %s\n", name, alias);
+    }
+
+    printf("-------------------------\n");
+
+    sqlite3_finalize(query);
 }
 
 void addGame(sqlite3* db, char* name, char* alias) {
@@ -85,11 +101,13 @@ bool tableExists(sqlite3* db, char* name) {
 }
 
 int prepareDb(sqlite3* db) {
+    // TODO: Add PRAGMA foreign_keys = ON
+
     if (!tableExists(db, "game")) {
         const char* sql = "CREATE TABLE game("
                             "game_id INTEGER PRIMARY KEY,"
-                            "name NVARCHAR(255),"
-                            "alias NVARCHAR (20)"
+                            "name NVARCHAR(255) UNIQUE,"
+                            "alias NVARCHAR (20) UNIQUE"
                           ")";
 
         int error = sqlite3_exec(db, sql, NULL, NULL, NULL);
@@ -142,9 +160,10 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
+    // TODO: Add rename feature
     char* cmd = argv[remainingOptionsIndex];
     if (strcmp(cmd, "report") == 0) {
-        report();
+        report(db);
     } else if (strcmp(cmd, "add-game") == 0) {
         if (remainingOptionsIndex + 1 >= argc) {
             printf("add-game: required argument <name>\n");

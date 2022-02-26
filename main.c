@@ -17,11 +17,9 @@ typedef struct arguments {
 } arguments;
 
 void assignArgument(int index, arguments* args, char* value) {
-    switch (index) {
-        // Consider: how to maintain index correctness as we add more
-        case 0:
-            args->alias = value;
-            break;
+    // Indexes are in order of specification in argumentSpec.
+    if (index == 0) {
+        args->alias = value;
     }
 }
 
@@ -44,8 +42,8 @@ arguments parseArguments(int argc, char* argv[], int* remainingOptionsIndex) {
 void printHelp() {
     printf("gamelog v0.1\n");
     printf("Supported commands:\n");
-    printf("- add-game <name> --alias <alias>\n");
-    printf("- log <name> --games <games> --date <date>\n");
+    printf("- add-game <name> --alias <string>\n");
+    printf("- log <name> --games <int> --date <date>\n");
     printf("- report\n");
 }
 
@@ -53,21 +51,29 @@ void report() {
     printf("report\n");
 }
 
-void addGame(int argc, char* argv[], int argsIndex) {
-    if (argsIndex >= argc) {
-        printf("add-game: required argument <name>\n");
-        return;
-    }
+void addGame(sqlite3* db, char* name, char* alias) {
+    sqlite3_stmt* query;
+    const char* sql = "INSERT INTO game(name, alias) VALUES(?, ?)";
 
-    char* name = argv[argsIndex];
-    printf("name: %s\n", name);
+    sqlite3_prepare_v2(db, sql, -1, &query, NULL);
+    sqlite3_bind_text(query, 1, name, -1, SQLITE_STATIC);
+    sqlite3_bind_text(query, 2, alias, -1, SQLITE_STATIC);
+
+    int result = sqlite3_step(query);
+
+    sqlite3_finalize(query);
+
+    if (result != SQLITE_DONE) {
+        printf("Error inserting game: %s\n", sqlite3_errmsg(db));
+    }
 }
 
 bool tableExists(sqlite3* db, char* name) {
     sqlite3_stmt* query;
     const char* sql = "SELECT name FROM sqlite_master WHERE type='table' AND name=?";
 
-    // Consider: preparing any re-usable statements on program launch
+    // We could prepare this statement on program launch, but realistically,
+    // it is not used enough to justify it.
     sqlite3_prepare_v2(db, sql, -1, &query, NULL);
     sqlite3_bind_text(query, 1, name, -1,  SQLITE_STATIC);
 
@@ -140,7 +146,15 @@ int main(int argc, char* argv[]) {
     if (strcmp(cmd, "report") == 0) {
         report();
     } else if (strcmp(cmd, "add-game") == 0) {
-        addGame(argc, argv, remainingOptionsIndex + 1);
+        if (remainingOptionsIndex + 1 >= argc) {
+            printf("add-game: required argument <name>\n");
+            return 1;
+        }
+
+        char* name = argv[remainingOptionsIndex + 1];
+        addGame(db, name, args.alias);
+    } else {
+        printf("Command not recognised: %s\n", cmd);
     }
 
     sqlite3_close(db);

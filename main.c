@@ -2,29 +2,40 @@
 #include <getopt.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sqlite3.h>
 
 // Passed to getopt to specify what arguments can be parsed
 struct option argumentSpec[] = {
     {"alias", required_argument, NULL, 0},
+    {"games", required_argument, NULL, 0},
     {0, 0, 0, 0}
 };
 
 // All possible arguments for commands. They are parsed ahead of command selection.
 typedef struct arguments {
     char* alias;
+    int games;
 } arguments;
+
+// Default argument values.
+const arguments defaultArgs = {
+    .alias = "",
+    .games = 1
+};
 
 void assignArgument(int index, arguments* args, char* value) {
     // Indexes are in order of specification in argumentSpec.
     if (index == 0) {
         args->alias = value;
+    } else if (index == 1) {
+        args->games = atoi(value);
     }
 }
 
 arguments parseArguments(int argc, char* argv[], int* remainingOptionsIndex) {
-    arguments args = {""};
+    arguments args = defaultArgs;
     int option_index = 0;
     int option;
 
@@ -49,18 +60,28 @@ void printHelp() {
 
 void report(sqlite3* db) {
     sqlite3_stmt* query;
-    const char* sql = "SELECT name, alias FROM game";
+    const char* sql = "SELECT name, alias, COUNT(play.game_id) "
+                        "FROM game LEFT JOIN play ON play.game_id = game.game_id "
+                        "GROUP BY game.name, game.alias";
 
     sqlite3_prepare_v2(db, sql, -1, &query, NULL);
 
-    printf("Name | Alias\n");
+    printf("Name | Alias | Plays\n");
     printf("-------------------------\n");
 
-    while (sqlite3_step(query) == SQLITE_ROW) {
+    int result = sqlite3_step(query);
+
+    if (result != SQLITE_ROW && result != SQLITE_DONE) {
+        printf("Error: %s\n", sqlite3_errmsg(db));
+    }
+
+    // TODO: Try to align columns
+    do {
         const char* name = sqlite3_column_text(query, 0);
         const char* alias = sqlite3_column_text(query, 1);
-        printf("%s | %s\n", name, alias);
-    }
+        int plays  = sqlite3_column_int(query, 2);
+        printf("%s | %s | %d\n", name, alias, plays);
+    } while (sqlite3_step(query) == SQLITE_ROW);
 
     printf("-------------------------\n");
 
@@ -82,6 +103,45 @@ void addGame(sqlite3* db, char* name, char* alias) {
     if (result != SQLITE_DONE) {
         printf("Error inserting game: %s\n", sqlite3_errmsg(db));
     }
+}
+
+int getGameId(sqlite3* db, char* nameOrAlias) {
+    sqlite3_stmt* query;
+    const char* sql = "SELECT game_id FROM game WHERE name = ?1 OR alias = ?1";
+
+    sqlite3_prepare_v2(db, sql, -1, &query, NULL);
+    sqlite3_bind_text(query, 1, nameOrAlias, -1, SQLITE_STATIC);
+
+    int result = sqlite3_step(query);
+
+    if (result != SQLITE_ROW) {
+        return -1;
+    }
+
+    int gameId = sqlite3_column_int(query, 0);
+
+    sqlite3_finalize(query);
+
+    return gameId;
+}
+
+void logPlay(sqlite3* db, char* nameOrAlias, int games) {
+    int gameId = getGameId(db, nameOrAlias);
+
+    if (gameId == -1) {
+        printf("No game found matching name or alias: %s\n", nameOrAlias);
+        return;
+    }
+
+    sqlite3_stmt* query;
+    const char* sql = "INSERT INTO play(game_id, games) VALUES(?, ?)";
+
+    sqlite3_prepare_v2(db, sql, -1, &query, NULL);
+    sqlite3_bind_int(query, 1, gameId);
+    sqlite3_bind_int(query, 2, games);
+
+    sqlite3_step(query);
+    sqlite3_finalize(query);
 }
 
 bool tableExists(sqlite3* db, char* name) {
@@ -172,6 +232,14 @@ int main(int argc, char* argv[]) {
 
         char* name = argv[remainingOptionsIndex + 1];
         addGame(db, name, args.alias);
+    } else if (strcmp(cmd, "log") == 0) {
+         if (remainingOptionsIndex + 1 >= argc) {
+            printf("log: required argument <name-or-alias>\n");
+            return 1;
+        }
+
+        char *nameOrAlias = argv[remainingOptionsIndex + 1];
+        logPlay(db, nameOrAlias, args.games);
     } else {
         printf("Command not recognised: %s\n", cmd);
     }

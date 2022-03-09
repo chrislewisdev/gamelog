@@ -60,13 +60,13 @@ void printHelp() {
 
 void report(sqlite3* db) {
     sqlite3_stmt* query;
-    const char* sql = "SELECT name, alias, COUNT(play.game_id) "
+    const char* sql = "SELECT name, alias, COUNT(play.game_id), SUM(play.games) "
                         "FROM game LEFT JOIN play ON play.game_id = game.game_id "
                         "GROUP BY game.name, game.alias";
 
     sqlite3_prepare_v2(db, sql, -1, &query, NULL);
 
-    printf("Name | Alias | Plays\n");
+    printf("Name | Alias | Plays | Games\n");
     printf("-------------------------\n");
 
     int result = sqlite3_step(query);
@@ -80,7 +80,8 @@ void report(sqlite3* db) {
         const char* name = sqlite3_column_text(query, 0);
         const char* alias = sqlite3_column_text(query, 1);
         int plays  = sqlite3_column_int(query, 2);
-        printf("%s | %s | %d\n", name, alias, plays);
+        int games = sqlite3_column_int(query, 3);
+        printf("%s | %s | %d | %d\n", name, alias, plays, games);
     } while (sqlite3_step(query) == SQLITE_ROW);
 
     printf("-------------------------\n");

@@ -9,3 +9,6 @@ clean:
 
 dependencies:
 	apt install libsqlite3-dev
+
+install: build/gamelog
+	cp build/gamelog /usr/local/bin/gamelog

@@ -8,6 +8,7 @@
 
 // Passed to getopt to specify what arguments can be parsed
 struct option argumentSpec[] = {
+    {"path", required_argument, NULL, 0},
     {"alias", required_argument, NULL, 0},
     {"games", required_argument, NULL, 0},
     {0, 0, 0, 0}
@@ -15,12 +16,14 @@ struct option argumentSpec[] = {
 
 // All possible arguments for commands. They are parsed ahead of command selection.
 typedef struct arguments {
+    char* path;
     char* alias;
     int games;
 } arguments;
 
 // Default argument values.
 const arguments defaultArgs = {
+    .path = "gamelog.db",
     .alias = "",
     .games = 1
 };
@@ -28,8 +31,10 @@ const arguments defaultArgs = {
 void assignArgument(int index, arguments* args, char* value) {
     // Indexes are in order of specification in argumentSpec.
     if (index == 0) {
-        args->alias = value;
+        args->path = value;
     } else if (index == 1) {
+        args->alias = value;
+    } else if (index == 2) {
         args->games = atoi(value);
     }
 }
@@ -208,7 +213,7 @@ int main(int argc, char* argv[]) {
 
     sqlite3* db;
     // Consider: add a parameter for the db path
-    int result = sqlite3_open("./gamelog.db", &db);
+    int result = sqlite3_open(args.path, &db);
     if (result != SQLITE_OK) {
         printf("Unable to open database: %s\n", sqlite3_errmsg(db));
         sqlite3_close(db);

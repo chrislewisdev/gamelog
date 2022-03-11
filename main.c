@@ -63,6 +63,20 @@ void printHelp() {
     printf("- report\n");
 }
 
+int getGamesCount(sqlite3* db) {
+    sqlite3_stmt* query;
+    const char* sql = "SELECT COUNT(game_id) FROM game";
+
+    sqlite3_prepare_v2(db, sql, -1, &query, NULL);
+    sqlite3_step(query);
+
+    int count = sqlite3_column_int(query, 0);
+
+    sqlite3_finalize(query);
+
+    return count;
+}
+
 void report(sqlite3* db) {
     sqlite3_stmt* query;
     const char* sql = "SELECT name, alias, COUNT(play.game_id), SUM(play.games) "

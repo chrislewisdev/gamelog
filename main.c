@@ -21,6 +21,13 @@ typedef struct arguments {
     int games;
 } arguments;
 
+typedef struct report_row {
+    const char* name;
+    const char* alias;
+    int plays;
+    int games;
+} report_row;
+
 // Default argument values.
 const arguments defaultArgs = {
     .path = "gamelog.db",
@@ -77,7 +84,18 @@ int getGamesCount(sqlite3* db) {
     return count;
 }
 
+const char* duplicateString(const char* str) {
+    int size = strlen(str);
+    char* duplicate = (char*)malloc(size + 1);
+    memset(duplicate, 0, size + 1);
+    strncpy(duplicate, str, size);
+    return duplicate;
+}
+
 void report(sqlite3* db) {
+    int gamesCount = getGamesCount(db);
+    report_row* rows = (report_row*)malloc(sizeof(report_row) * gamesCount);
+
     sqlite3_stmt* query;
     const char* sql = "SELECT name, alias, COUNT(play.game_id), SUM(play.games) "
                         "FROM game LEFT JOIN play ON play.game_id = game.game_id "
@@ -95,17 +113,25 @@ void report(sqlite3* db) {
     }
 
     // TODO: Try to align columns
+    int rowIndex = 0;
     do {
-        const char* name = sqlite3_column_text(query, 0);
-        const char* alias = sqlite3_column_text(query, 1);
-        int plays  = sqlite3_column_int(query, 2);
-        int games = sqlite3_column_int(query, 3);
-        printf("%s | %s | %d | %d\n", name, alias, plays, games);
+        rows[rowIndex].name = duplicateString(sqlite3_column_text(query, 0));
+        rows[rowIndex].alias = duplicateString(sqlite3_column_text(query, 1));
+        rows[rowIndex].plays  = sqlite3_column_int(query, 2);
+        rows[rowIndex].games = sqlite3_column_int(query, 3);
+        rowIndex++;
     } while (sqlite3_step(query) == SQLITE_ROW);
+
+    for (int i = 0; i < gamesCount; i++) {
+        printf("%s | %s | %d | %d\n", rows[i].name, rows[i].alias, rows[i].plays, rows[i].games);
+        free((void*)rows[i].name);
+        free((void*)rows[i].alias);
+    }
 
     printf("-------------------------\n");
 
     sqlite3_finalize(query);
+    free(rows);
 }
 
 void addGame(sqlite3* db, char* name, char* alias) {

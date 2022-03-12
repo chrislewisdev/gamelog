@@ -92,8 +92,10 @@ const char* duplicateString(const char* str) {
     return duplicate;
 }
 
-void report(sqlite3* db) {
+report_row* getPlayReport(sqlite3* db, int* outRowCount) {
     int gamesCount = getGamesCount(db);
+    if (gamesCount <= 0) return NULL;
+
     report_row* rows = (report_row*)malloc(sizeof(report_row) * gamesCount);
 
     sqlite3_stmt* query;
@@ -102,36 +104,50 @@ void report(sqlite3* db) {
                         "GROUP BY game.name, game.alias";
 
     sqlite3_prepare_v2(db, sql, -1, &query, NULL);
-
-    printf("Name | Alias | Plays | Games\n");
-    printf("-------------------------\n");
-
     int result = sqlite3_step(query);
 
     if (result != SQLITE_ROW && result != SQLITE_DONE) {
         printf("Error: %s\n", sqlite3_errmsg(db));
     }
 
-    // TODO: Try to align columns
-    int rowIndex = 0;
+    int i = 0;
     do {
-        rows[rowIndex].name = duplicateString(sqlite3_column_text(query, 0));
-        rows[rowIndex].alias = duplicateString(sqlite3_column_text(query, 1));
-        rows[rowIndex].plays  = sqlite3_column_int(query, 2);
-        rows[rowIndex].games = sqlite3_column_int(query, 3);
-        rowIndex++;
+        rows[i].name = duplicateString(sqlite3_column_text(query, 0));
+        rows[i].alias = duplicateString(sqlite3_column_text(query, 1));
+        rows[i].plays  = sqlite3_column_int(query, 2);
+        rows[i].games = sqlite3_column_int(query, 3);
+        i++;
     } while (sqlite3_step(query) == SQLITE_ROW);
 
-    for (int i = 0; i < gamesCount; i++) {
-        printf("%s | %s | %d | %d\n", rows[i].name, rows[i].alias, rows[i].plays, rows[i].games);
+    sqlite3_finalize(query);
+
+    *outRowCount = gamesCount;
+    return rows;
+}
+
+void disposeReport(report_row* rows, int rowCount) {
+    for (int i = 0; i < rowCount; i++) {
         free((void*)rows[i].name);
         free((void*)rows[i].alias);
+    }
+    free(rows);
+}
+
+void report(sqlite3* db) {
+    int rowCount;
+    report_row* rows = getPlayReport(db, &rowCount);
+
+    printf("Name | Alias | Plays | Games\n");
+    printf("-------------------------\n");
+
+    // TODO: Try to align columns
+    for (int i = 0; i < rowCount; i++) {
+        printf("%s | %s | %d | %d\n", rows[i].name, rows[i].alias, rows[i].plays, rows[i].games);
     }
 
     printf("-------------------------\n");
 
-    sqlite3_finalize(query);
-    free(rows);
+    disposeReport(rows, rowCount);
 }
 
 void addGame(sqlite3* db, char* name, char* alias) {

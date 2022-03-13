@@ -98,6 +98,7 @@ report_row* getPlayReport(sqlite3* db, int* outRowCount) {
 
     report_row* rows = (report_row*)malloc(sizeof(report_row) * gamesCount);
 
+    // TODO: Order by plays
     sqlite3_stmt* query;
     const char* sql = "SELECT name, alias, COUNT(play.game_id), SUM(play.games) "
                         "FROM game LEFT JOIN play ON play.game_id = game.game_id "
@@ -133,19 +134,46 @@ void disposeReport(report_row* rows, int rowCount) {
     free(rows);
 }
 
-void report(sqlite3* db) {
-    int rowCount;
-    report_row* rows = getPlayReport(db, &rowCount);
+void getReportColumnWidths(report_row* rows, int rowCount, int* outNameWidth, int* outAliasWidth) {
+    int maxNameWidth = 0;
+    int maxAliasWidth = 0;
 
-    printf("Name | Alias | Plays | Games\n");
-    printf("-------------------------\n");
-
-    // TODO: Try to align columns
     for (int i = 0; i < rowCount; i++) {
-        printf("%s | %s | %d | %d\n", rows[i].name, rows[i].alias, rows[i].plays, rows[i].games);
+        int nameWidth = strlen(rows[i].name);
+        int aliasWidth = strlen(rows[i].alias);
+
+        if (nameWidth > maxNameWidth) maxNameWidth = nameWidth;
+        if (aliasWidth > maxAliasWidth) maxAliasWidth = aliasWidth;
     }
 
-    printf("-------------------------\n");
+    *outNameWidth = maxNameWidth;
+    *outAliasWidth = maxAliasWidth;
+}
+
+void report(sqlite3* db) {
+    int rowCount, nameWidth, aliasWidth;
+    report_row* rows = getPlayReport(db, &rowCount);
+    getReportColumnWidths(rows, rowCount, &nameWidth, &aliasWidth);
+
+    if (nameWidth < strlen("Name")) nameWidth = strlen("Name");
+    if (aliasWidth < strlen("Alias")) aliasWidth = strlen("Alias");
+
+    // Magic numbers are the constant column widths / spacings
+    int tableWidth = nameWidth + 2 + aliasWidth + 3 + 8 + 6;
+
+    printf("%-*s | %-*s | Plays | Games\n", nameWidth, "Name", aliasWidth, "Alias");
+
+    for (int i = 0; i < tableWidth; i++) printf("-"); printf("\n");
+
+    for (int i = 0; i < rowCount; i++) {
+        printf("%-*s | %-*s | %5d | %5d\n",
+            nameWidth, rows[i].name,
+            aliasWidth, rows[i].alias,
+            rows[i].plays,
+            rows[i].games);
+    }
+
+    for (int i = 0; i < tableWidth; i++) printf("-"); printf("\n");
 
     disposeReport(rows, rowCount);
 }
@@ -195,6 +223,7 @@ void logPlay(sqlite3* db, char* nameOrAlias, int games) {
         return;
     }
 
+    // TODO: Add date param
     sqlite3_stmt* query;
     const char* sql = "INSERT INTO play(game_id, games) VALUES(?, ?)";
 

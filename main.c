@@ -98,11 +98,11 @@ report_row* getPlayReport(sqlite3* db, int* outRowCount) {
 
     report_row* rows = (report_row*)malloc(sizeof(report_row) * gamesCount);
 
-    // TODO: Order by plays
     sqlite3_stmt* query;
     const char* sql = "SELECT name, alias, COUNT(play.game_id), SUM(play.games) "
                         "FROM game LEFT JOIN play ON play.game_id = game.game_id "
-                        "GROUP BY game.name, game.alias";
+                        "GROUP BY game.name, game.alias "
+                        "ORDER BY 3 DESC, 4 DESC";
 
     sqlite3_prepare_v2(db, sql, -1, &query, NULL);
     int result = sqlite3_step(query);
@@ -161,10 +161,12 @@ void report(sqlite3* db) {
     // Magic numbers are the constant column widths / spacings
     int tableWidth = nameWidth + 2 + aliasWidth + 3 + 8 + 6;
 
+    // Table header
+    for (int i = 0; i < tableWidth; i++) printf("-"); printf("\n");
     printf("%-*s | %-*s | Plays | Games\n", nameWidth, "Name", aliasWidth, "Alias");
-
     for (int i = 0; i < tableWidth; i++) printf("-"); printf("\n");
 
+    // Table contents
     for (int i = 0; i < rowCount; i++) {
         printf("%-*s | %-*s | %5d | %5d\n",
             nameWidth, rows[i].name,
@@ -173,6 +175,7 @@ void report(sqlite3* db) {
             rows[i].games);
     }
 
+    // Footer
     for (int i = 0; i < tableWidth; i++) printf("-"); printf("\n");
 
     disposeReport(rows, rowCount);
